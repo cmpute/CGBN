@@ -37,7 +37,7 @@ __device__ __forceinline__ void core_t<env>::mont_mul(uint32_t r[LIMBS], const u
   }
   ra[LIMBS+1]=0;
   
-  #pragma nounroll
+  #pragma unroll
   for(int32_t thread=0;thread<TPI;thread+=2) {
     #pragma unroll
     for(int32_t word=0;word<2*LIMBS;word+=2) {
