@@ -43,7 +43,7 @@ __device__ __forceinline__ cgbn_context_t<tpi, params>::cgbn_context_t() : _moni
 template<uint32_t tpi, class params>
 __device__ __forceinline__ cgbn_context_t<tpi, params>::cgbn_context_t(cgbn_monitor_t monitor) : _monitor(monitor), _report(NULL), _instance(0xFFFFFFFF) {
   if(monitor!=cgbn_no_checks) {
-    if(tpi!=32 && tpi!=16 && tpi!=8 && tpi!=4)
+    if(tpi!=32 && tpi!=16 && tpi!=8 && tpi!=4 && tpi!=2)
       report_error(cgbn_unsupported_threads_per_instance);
     if(params::TPB!=0 && params::TPB!=blockDim.x)
       report_error(cgbn_threads_per_block_mismatch);
@@ -55,7 +55,7 @@ __device__ __forceinline__ cgbn_context_t<tpi, params>::cgbn_context_t(cgbn_moni
 template<uint32_t tpi, class params>
 __device__ __forceinline__ cgbn_context_t<tpi, params>::cgbn_context_t(cgbn_monitor_t monitor, cgbn_error_report_t *report) : _monitor(monitor), _report(report), _instance(0xFFFFFFFF) {
   if(monitor!=cgbn_no_checks) {
-    if(tpi!=32 && tpi!=16 && tpi!=8 && tpi!=4)
+    if(tpi!=32 && tpi!=16 && tpi!=8 && tpi!=4 && tpi!=2)
       report_error(cgbn_unsupported_threads_per_instance);
     if(params::TPB!=0 && params::TPB!=blockDim.x)
       report_error(cgbn_threads_per_block_mismatch);
@@ -67,7 +67,7 @@ __device__ __forceinline__ cgbn_context_t<tpi, params>::cgbn_context_t(cgbn_moni
 template<uint32_t tpi, class params>
 __device__ __forceinline__ cgbn_context_t<tpi, params>::cgbn_context_t(cgbn_monitor_t monitor, cgbn_error_report_t *report, uint32_t instance) : _monitor(monitor), _report(report), _instance(instance) {
   if(monitor!=cgbn_no_checks) {
-    if(tpi!=32 && tpi!=16 && tpi!=8 && tpi!=4)
+    if(tpi!=32 && tpi!=16 && tpi!=8 && tpi!=4 && tpi!=2)
       report_error(cgbn_unsupported_threads_per_instance);
     if(params::TPB!=0 && params::TPB!=blockDim.x)
       report_error(cgbn_threads_per_block_mismatch);
