@@ -103,6 +103,17 @@ __host__ __device__ __forceinline__ int32_t cgbn_sub(env_t env, typename env_t::
 }
 
 template<class env_t>
+__host__ __device__ __forceinline__ void cgbn_mod_sub(env_t env, typename env_t::cgbn_t &r, const typename env_t::cgbn_t &a, const typename env_t::cgbn_t &b, const typename env_t::cgbn_t &m) {
+  env.mod_sub(r, a, b, m);
+}
+
+template<class env_t>
+__host__ __device__ __forceinline__ void cgbn_mod_add(env_t env, typename env_t::cgbn_t &r, const typename env_t::cgbn_t &a, const typename env_t::cgbn_t &b, const typename env_t::cgbn_t &m) {
+  env.mod_add(r, a, b, m);
+}
+
+
+template<class env_t>
 __host__ __device__ __forceinline__ int32_t cgbn_negate(env_t env, typename env_t::cgbn_t &r, const typename env_t::cgbn_t &a) {
   return env.negate(r, a);
 }

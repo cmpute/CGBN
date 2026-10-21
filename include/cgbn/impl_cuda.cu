@@ -1034,6 +1034,16 @@ __device__ __forceinline__ void cgbn_env_t<context_t, bits, syncable>::mont_sqr(
 }
 
 template<class context_t, uint32_t bits, cgbn_syncable_t syncable>
+__device__ __forceinline__ void cgbn_env_t<context_t, bits, syncable>::mod_sub(cgbn_t &r, const cgbn_t &a, const cgbn_t &b, const cgbn_t &m) const {
+  cgbn::core_singleton_t<cgbn_env_t, LIMBS>::mod_sub(r._limbs, a._limbs, b._limbs, m._limbs);
+}
+
+template<class context_t, uint32_t bits, cgbn_syncable_t syncable>
+__device__ __forceinline__ void cgbn_env_t<context_t, bits, syncable>::mod_add(cgbn_t &r, const cgbn_t &a, const cgbn_t &b, const cgbn_t &m) const {
+  cgbn::core_singleton_t<cgbn_env_t, LIMBS>::mod_add(r._limbs, a._limbs, b._limbs, m._limbs);
+}
+
+template<class context_t, uint32_t bits, cgbn_syncable_t syncable>
 __device__ __forceinline__ void cgbn_env_t<context_t, bits, syncable>::mont_reduce_wide(cgbn_t &r, const cgbn_wide_t &a, const cgbn_t &n, const uint32_t np0) const {
   typedef cgbn::unpadded_t<cgbn_env_t> unpadded;
   typedef cgbn::core_t<unpadded> core;

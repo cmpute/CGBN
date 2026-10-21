@@ -190,6 +190,8 @@ class core_t {
   /* BASIC ARITHMETIC */
   __device__ __forceinline__ static int32_t  add(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t b[LIMBS]);
   __device__ __forceinline__ static int32_t  sub(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t b[LIMBS]);
+  __device__ __forceinline__ static void      mod_sub(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t b[LIMBS], const uint32_t m[LIMBS]);
+  __device__ __forceinline__ static void      mod_add(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t b[LIMBS], const uint32_t m[LIMBS]);
   __device__ __forceinline__ static int32_t  negate(uint32_t r[LIMBS], const uint32_t a[LIMBS]);
   __device__ __forceinline__ static void     mul(uint32_t &r, const uint32_t a, const uint32_t b, const uint32_t add);
   __device__ __forceinline__ static void     mul(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t b[LIMBS], const uint32_t add[LIMBS]);
