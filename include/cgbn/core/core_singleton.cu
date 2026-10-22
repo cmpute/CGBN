@@ -94,6 +94,10 @@ class core_singleton_t<env, 1> {
     core_t<env>::mont_mul(r[0], a[0], b[0], n[0], np0);
   }
 
+  __device__ __forceinline__ static void      mont_mul_ui32(uint32_t r[limbs], const uint32_t a[limbs], const uint32_t d, const uint32_t n[limbs], const uint32_t np0) {
+    core_t<env>::mont_mul_ui32(r[0], a[0], d, n[0], np0);
+  }
+
   __device__ __forceinline__ static void      mod_sub(uint32_t r[limbs], const uint32_t a[limbs], const uint32_t b[limbs], const uint32_t m[limbs]) {
     core_t<env>::mod_sub(r, a, b, m);       // distributed value: the array
   }                                         // version resolves cross-lane carries
@@ -167,6 +171,10 @@ class core_singleton_t {
   
   __device__ __forceinline__ static void      mont_mul(uint32_t r[limbs], const uint32_t a[limbs], const uint32_t b[limbs], const uint32_t n[limbs], const uint32_t np0) {
     core_t<env>::mont_mul(r, a, b, n, np0);
+  }
+
+  __device__ __forceinline__ static void      mont_mul_ui32(uint32_t r[limbs], const uint32_t a[limbs], const uint32_t d, const uint32_t n[limbs], const uint32_t np0) {
+    core_t<env>::mont_mul_ui32(r, a, d, n, np0);
   }
 
   __device__ __forceinline__ static void      mod_sub(uint32_t r[limbs], const uint32_t a[limbs], const uint32_t b[limbs], const uint32_t m[limbs]) {

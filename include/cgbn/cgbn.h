@@ -457,6 +457,14 @@ __host__ __device__ __forceinline__ void cgbn_mont_sqr(env_t env, typename env_t
   env.mont_sqr(r, a, n, np0);
 }
 
+/* r = a * d / 2^32 mod n for 32-bit scalar d (one Montgomery limb step;
+   the fused form of GMP-ECM's special_mult_ui32).  n must be odd and at
+   least 2^32, a in [0, 2^BITS), d in [0, 2^32); the result is less than 2n. */
+template<class env_t>
+__host__ __device__ __forceinline__ void cgbn_mont_mul_ui32(env_t env, typename env_t::cgbn_t &r, const typename env_t::cgbn_t &a, const uint32_t d, const typename env_t::cgbn_t &n, const uint32_t np0) {
+  env.mont_mul_ui32(r, a, d, n, np0);
+}
+
 template<class env_t>
 __host__ __device__ __forceinline__ void cgbn_mont_reduce_wide(env_t env, typename env_t::cgbn_t &r, const typename env_t::cgbn_wide_t &a, const typename env_t::cgbn_t &n, const uint32_t np0) {
   env.mont_reduce_wide(r, a, n, np0);

@@ -191,6 +191,62 @@ __device__ __forceinline__ void core_t<env>::mont_mul(uint32_t r[LIMBS], const u
 }
 #endif
 
+/* r = a * d / 2^32 mod n -- one Montgomery limb step with a 32-bit scalar.
+   a in [0, 2^(BITS-1)), d in [0, 2^32), n odd and n >= 2^32; returns r < 2n.
+   The wide product w = a*d (L+1 significant words) is formed locally with the
+   boundary carry folded into the next thread, placed into the canonical wide
+   layout shifted up by L-1 limbs (w * 2^(32*(L-1))), and reduced with one
+   mont_reduce_wide -- which then yields w / 2^32 mod n. */
+template<class env>
+__device__ __forceinline__ void core_t<env>::mont_mul_ui32(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t d, const uint32_t n[LIMBS], const uint32_t np0) {
+  uint32_t sync=sync_mask(), group_thread=threadIdx.x & TPI-1;
+  uint32_t lo[LIMBS], hi[LIMBS], c, carry;
+
+  // w = a*d: lo[index] = word group_thread*LIMBS+index; the running high word
+  // crosses into the next thread's lo[0]
+  c=0;
+  #pragma unroll
+  for(int32_t index=0;index<LIMBS;index++) {
+    lo[index]=madlo_cc(a[index], d, c);   // lo + carry from the previous word
+    c=madhic(a[index], d, 0);             // hi(a*d) + the madlo carry; c itself
+  }                                      // was already consumed by madlo_cc
+
+  carry=__shfl_up_sync(sync, c, 1, TPI);
+  if(group_thread==0)
+    carry=0;
+  {
+    uint32_t s=lo[0]+carry, cy=(s<lo[0]);
+    lo[0]=s;
+    #pragma unroll
+    for(int32_t index=1;index<LIMBS;index++) {
+      s=lo[index]+cy; cy=(s<lo[index]); lo[index]=s;
+    }
+    c=c+cy;   // top thread: word TPI*LIMBS of w (multi-bit; keep exact)
+  }
+
+  // shift w up by L-1 limbs inside the canonical wide layout:
+  //   w' word t*LIMBS+i   (t*LIMBS+i < L)  = 0 except w' word L-1 = w word 0
+  //   w' word L+t*LIMBS+i              = w word t*LIMBS+i+1
+  {
+    uint32_t next_lo0=__shfl_down_sync(sync, lo[0], 1, TPI);  // top thread: own value (unused)
+    uint32_t w0=__shfl_sync(sync, lo[0], 0, TPI);
+
+    #pragma unroll
+    for(int32_t index=0;index<LIMBS-1;index++)
+      hi[index]=lo[index+1];
+    hi[LIMBS-1]=(group_thread==TPI-1) ? c : next_lo0;
+
+    #pragma unroll
+    for(int32_t index=0;index<LIMBS;index++)
+      lo[index]=0;
+    if(group_thread==TPI-1)
+      lo[LIMBS-1]=w0;
+  }
+
+  mont_reduce_wide(r, lo, hi, n, np0, false);
+  clear_padding(r);
+}
+
 template<class env>
 __device__ __forceinline__ void core_t<env>::mont_reduce_wide(uint32_t r[LIMBS], const uint32_t lo[LIMBS], const uint32_t hi[LIMBS], const uint32_t n[LIMBS], const uint32_t np0, const bool zero) {
   uint32_t sync=sync_mask(), group_thread=threadIdx.x & TPI-1;

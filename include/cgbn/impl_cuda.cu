@@ -1034,6 +1034,11 @@ __device__ __forceinline__ void cgbn_env_t<context_t, bits, syncable>::mont_sqr(
 }
 
 template<class context_t, uint32_t bits, cgbn_syncable_t syncable>
+__device__ __forceinline__ void cgbn_env_t<context_t, bits, syncable>::mont_mul_ui32(cgbn_t &r, const cgbn_t &a, const uint32_t d, const cgbn_t &n, const uint32_t np0) const {
+  cgbn::core_singleton_t<cgbn_env_t, LIMBS>::mont_mul_ui32(r._limbs, a._limbs, d, n._limbs, np0);
+}
+
+template<class context_t, uint32_t bits, cgbn_syncable_t syncable>
 __device__ __forceinline__ void cgbn_env_t<context_t, bits, syncable>::mod_sub(cgbn_t &r, const cgbn_t &a, const cgbn_t &b, const cgbn_t &m) const {
   cgbn::core_singleton_t<cgbn_env_t, LIMBS>::mod_sub(r._limbs, a._limbs, b._limbs, m._limbs);
 }
