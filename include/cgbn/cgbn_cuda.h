@@ -225,6 +225,7 @@ class cgbn_env_t {
   __device__ __forceinline__ void       mont2bn(cgbn_t &bn, const cgbn_t &mont, const cgbn_t &n, const uint32_t np0) const;
   __device__ __forceinline__ void       mont_mul(cgbn_t &r, const cgbn_t &a, const cgbn_t &b, const cgbn_t &n, const uint32_t np0) const;
   __device__ __forceinline__ void       mont_sqr(cgbn_t &r, const cgbn_t &a, const cgbn_t &n, const uint32_t np0) const;
+  __device__ __forceinline__ void       mont_mul_ui32(cgbn_t &r, const cgbn_t &a, const uint32_t d, const cgbn_t &n, const uint32_t np0) const;
   __device__ __forceinline__ void       mont_reduce_wide(cgbn_t &r, const cgbn_wide_t &a, const cgbn_t &n, const uint32_t np0) const;
 
   __device__ __forceinline__ uint32_t   barrett_approximation(cgbn_t &approx, const cgbn_t &denom) const;

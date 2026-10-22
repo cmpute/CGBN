@@ -76,6 +76,54 @@ __device__ __forceinline__ void core_t<env>::mont_mul(uint32_t &r, const uint32_
   r=r0; 
 }
 
+/* r = a * d / 2^32 mod n -- one Montgomery limb step with a 32-bit scalar.
+   a in [0, 2^BITS), d in [0, 2^32), n odd and n >= 2^32; returns r < 2n.
+   Costs one product row plus one REDC row instead of the TPI rows of
+   mont_mul(a, d*R^{TPI-1}), i.e. the fused form of ecm's special_mult_ui32. */
+template<class env>
+__device__ __forceinline__ void core_t<env>::mont_mul_ui32(uint32_t &r, const uint32_t a, const uint32_t d, const uint32_t n, const uint32_t np0) {
+  uint32_t sync=sync_mask(), group_thread=threadIdx.x & TPI-1;
+  uint32_t r0, r1, r2, t, c;
+
+  // w = a*d; this thread holds word group_thread (r0) and word group_thread+1 (r1)
+  r0=madlo(a, d, 0);
+  r1=madhi(a, d, 0);
+
+  // single REDC step: q = w_low * np0 zeroes lane 0, so the top-lane wrap is benign
+  t=__shfl_sync(sync, r0, 0, TPI)*np0;
+  r0=madlo_cc(n, t, r0);
+  r1=madhic_cc(n, t, r1);
+  r2=addc(0, 0);
+
+  // shift right by 32 bits (top thread gets the zeroed lane 0)
+  r0=__shfl_sync(sync, r0, threadIdx.x+1, TPI);
+  r0=add_cc(r0, r1);
+  r1=addc(r2, 0);
+
+  // same tail as mont_mul
+  t=__shfl_up_sync(sync, r1, 1, TPI);
+
+  if(group_thread!=TPI-1)
+    r1=0;
+  if(group_thread==0)
+    t=0;
+
+  r0=add_cc(r0, t);
+  c=addc(r1, 0);
+
+  c=fast_propagate_add(c, r0);
+
+  // compute -n
+  t=n-(group_thread==0);   // n must be odd, so there is no chance for a carry ripple
+  t=~t & -c;
+
+  r0=add_cc(r0, t);
+  c=addc(0, 0);
+  fast_propagate_add(c, r0);
+
+  r=r0;
+}
+
 template<class env>
 __device__ __forceinline__ void core_t<env>::mont_reduce_wide(uint32_t &r, const uint32_t lo, const uint32_t hi, const uint32_t n, const uint32_t np0, const bool zero) {
   uint32_t sync=sync_mask(), group_thread=threadIdx.x & TPI-1;
