@@ -110,6 +110,54 @@ class dispatch_resolver_t<core, tpi, 0> {
 
     return uright_wrap(sum>>32, 0, threadIdx.x - group_thread + tpi) & 0x01;
   }
+
+  /* opt-07: converged variant for the straight-line montgomery tails in
+   * core_mont*.cu.  All 32 lanes participate (no divergence, no exited
+   * lanes), so the ballots take the compile-time full-warp mask -- inlined
+   * VOTE instead of the __cuda_sm70_votesync_ballot helper call -- and are
+   * confined to this instance's bit window with the per-lane instance mask
+   * (bit-identical to ballot(sync_mask(), ...) in this context; within a
+   * segment every lane holds the same mask word).  Instance-divergent
+   * contexts must call the plain variants. */
+  __device__ __forceinline__ static int32_t fast_propagate_add_conv(const uint32_t carry, uint32_t &x) {
+    uint32_t sync=core::sync_mask(), group_thread=threadIdx.x & tpi-1, warp_thread=threadIdx.x & warpSize-1;
+    uint32_t lane=(group_thread==0) ? 0 : 1<<warp_thread;
+    uint32_t g, p, c; 
+    uint64_t sum;
+  
+    g=__ballot_sync(0xFFFFFFFF, carry==1) & sync;
+    p=__ballot_sync(0xFFFFFFFF, x==0xFFFFFFFF && group_thread!=0) & sync;
+  
+    // wrap the carry around  
+    sum=make_wide(g, g) + make_wide(g, g) + make_wide(p, p);
+    c=lane&(p^sum);
+
+    x=x+(c!=0);
+
+    return uright_wrap(sum>>32, 0, threadIdx.x - group_thread + tpi) & 0x01;
+  }
+  
+  __device__ __forceinline__ static int32_t fast_propagate_add_conv(const uint32_t carry, uint32_t x[LIMBS]) {
+    uint32_t sync=core::sync_mask(), group_thread=threadIdx.x & tpi-1, warp_thread=threadIdx.x & warpSize-1;
+    uint32_t lane=(group_thread==0) ? 0 : 1<<warp_thread;
+    uint32_t land, g, p, c; 
+    uint64_t sum;
+    
+    land=mpland<LIMBS>(x);
+    g=__ballot_sync(0xFFFFFFFF, carry==1) & sync;
+    p=__ballot_sync(0xFFFFFFFF, land==0xFFFFFFFF && group_thread!=0) & sync;
+
+    // wrap the carry around  
+    sum=make_wide(g, g) + make_wide(g, g) + make_wide(p, p);
+    c=lane & (p ^ sum);
+    
+    x[0]=add_cc(x[0], c!=0);
+    #pragma unroll
+    for(int32_t index=1;index<LIMBS;index++)
+      x[index]=addc_cc(x[index], 0);
+
+    return uright_wrap(sum>>32, 0, threadIdx.x - group_thread + tpi) & 0x01;
+  }
   
   
   /****************************************************************

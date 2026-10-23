@@ -24,10 +24,24 @@ IN THE SOFTWARE.
 
 namespace cgbn {
 
+/* opt-07: straight-line collective code (see core_mont_wmad.cu) -- the
+   compile-time full-warp shfl mask avoids the __cuda_sm70_shflsync helper
+   call that a runtime instance mask produces on TPI<32. */
+/* opt-07: the inline-SHFL codegen is scoped to PADDING==0 shapes.  On the
+ * padded path (e.g. 544/8) constant-folding the shfl/ballot masks to
+ * 0xFFFFFFFF triggers an nvcc 13.0 miscompile of the same family as the
+ * documented cgbn_sub full-container anomaly (dirty words above BITS/32 in
+ * one-iteration mulcheck runs; shape-isolated to padded mont codegen, green
+ * on every PADDING==0 shape incl. odd-LIMBS 768/8 and 384/4).  The ternary
+ * folds at compile time: padded instantiations keep the base instance-mask
+ * path bit-for-bit, unpadded ones get the inlined collectives. */
+#define CGBN_MONT_SYNC ((PADDING==0)?CGBN_WARP_SYNC:sync_mask())
+#define CGBN_WARP_SYNC 0xFFFFFFFFu
+
 /* single limb version */
 template<class env>
 __device__ __forceinline__ void core_t<env>::mont_mul(uint32_t &r, const uint32_t a, const uint32_t b, const uint32_t n, const uint32_t np0) {
-  uint32_t sync=sync_mask(), group_thread=threadIdx.x & TPI-1;
+  uint32_t sync=CGBN_MONT_SYNC, group_thread=threadIdx.x & TPI-1;
   uint32_t r0=0, r1=0, r2, t, c;
   
   #pragma unroll
@@ -63,7 +77,7 @@ __device__ __forceinline__ void core_t<env>::mont_mul(uint32_t &r, const uint32_
   r0=add_cc(r0, t);
   c=addc(r1, 0);
 
-  c=fast_propagate_add(c, r0);
+  if(PADDING==0) c=fast_propagate_add_conv(c, r0); else c=fast_propagate_add(c, r0);
   
   // compute -n
   t=n-(group_thread==0);   // n must be odd, so there is no chance for a carry ripple
@@ -71,7 +85,7 @@ __device__ __forceinline__ void core_t<env>::mont_mul(uint32_t &r, const uint32_
 
   r0=add_cc(r0, t);
   c=addc(0, 0);
-  fast_propagate_add(c, r0);
+  if(PADDING==0) fast_propagate_add_conv(c, r0); else fast_propagate_add(c, r0);
 
   r=r0; 
 }
@@ -82,7 +96,7 @@ __device__ __forceinline__ void core_t<env>::mont_mul(uint32_t &r, const uint32_
    mont_mul(a, d*R^{TPI-1}), i.e. the fused form of ecm's special_mult_ui32. */
 template<class env>
 __device__ __forceinline__ void core_t<env>::mont_mul_ui32(uint32_t &r, const uint32_t a, const uint32_t d, const uint32_t n, const uint32_t np0) {
-  uint32_t sync=sync_mask(), group_thread=threadIdx.x & TPI-1;
+  uint32_t sync=CGBN_MONT_SYNC, group_thread=threadIdx.x & TPI-1;
   uint32_t r0, r1, r2, t, c;
 
   // w = a*d; this thread holds word group_thread (r0) and word group_thread+1 (r1)
@@ -111,7 +125,7 @@ __device__ __forceinline__ void core_t<env>::mont_mul_ui32(uint32_t &r, const ui
   r0=add_cc(r0, t);
   c=addc(r1, 0);
 
-  c=fast_propagate_add(c, r0);
+  if(PADDING==0) c=fast_propagate_add_conv(c, r0); else c=fast_propagate_add(c, r0);
 
   // compute -n
   t=n-(group_thread==0);   // n must be odd, so there is no chance for a carry ripple
@@ -119,14 +133,14 @@ __device__ __forceinline__ void core_t<env>::mont_mul_ui32(uint32_t &r, const ui
 
   r0=add_cc(r0, t);
   c=addc(0, 0);
-  fast_propagate_add(c, r0);
+  if(PADDING==0) fast_propagate_add_conv(c, r0); else fast_propagate_add(c, r0);
 
   r=r0;
 }
 
 template<class env>
 __device__ __forceinline__ void core_t<env>::mont_reduce_wide(uint32_t &r, const uint32_t lo, const uint32_t hi, const uint32_t n, const uint32_t np0, const bool zero) {
-  uint32_t sync=sync_mask(), group_thread=threadIdx.x & TPI-1;
+  uint32_t sync=CGBN_MONT_SYNC, group_thread=threadIdx.x & TPI-1;
   uint32_t r0=lo, r1=0, t, top;
   
   #pragma unroll
@@ -147,7 +161,7 @@ __device__ __forceinline__ void core_t<env>::mont_reduce_wide(uint32_t &r, const
     r1=addc(0, 0);
   }
  
-  r1=fast_propagate_add(r1, r0);
+  if(PADDING==0) r1=fast_propagate_add_conv(r1, r0); else r1=fast_propagate_add(r1, r0);
 
   if(!zero && r1!=0) {
     // compute -n

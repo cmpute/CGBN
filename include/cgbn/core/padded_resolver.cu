@@ -120,6 +120,48 @@ class dispatch_resolver_t {
     x[PAD_LIMB]=(group_thread!=PAD_THREAD) ? x[PAD_LIMB] : 0;
     return result;
   }
+
+  /* opt-07: converged variant for the straight-line montgomery tails
+   * (core_mont*.cu): compile-time full-warp ballot/shfl masks (inlined
+   * VOTE/SHFL instead of helper calls), ballots confined to this instance's
+   * window with the per-lane instance mask.  Instance-divergent contexts
+   * must call the plain variants. */
+  __device__ __forceinline__ static int32_t fast_propagate_add_conv(const uint32_t carry, uint32_t &x) {
+    uint32_t sync=core::sync_mask(), group_thread=threadIdx.x & tpi-1, warp_thread=threadIdx.x & warpSize-1, lane=1<<warp_thread;
+    uint32_t g, p, c;
+    int32_t  result;
+  
+    g=__ballot_sync(0xFFFFFFFF, carry==1) & sync;
+    p=__ballot_sync(0xFFFFFFFF, x==0xFFFFFFFF) & sync;
+  
+    c=lane & (g+g+p ^ p);
+    x=x+(c!=0);
+  
+    result=__shfl_sync(0xFFFFFFFF, x, padding, tpi);
+    x=(group_thread<padding) ? x : 0;
+    return result;
+  }
+  
+  __device__ __forceinline__ static int32_t fast_propagate_add_conv(const uint32_t carry, uint32_t x[LIMBS]) {
+    uint32_t sync=core::sync_mask(), group_thread=threadIdx.x & tpi-1, warp_thread=threadIdx.x & warpSize-1, lane=1<<warp_thread;
+    uint32_t land, g, p, c;
+    int32_t  result;
+    
+    land=mpland<LIMBS>(x);
+    g=__ballot_sync(0xFFFFFFFF, carry==1) & sync;
+    p=__ballot_sync(0xFFFFFFFF, land==0xFFFFFFFF) & sync;
+  
+    c=lane & (g+g+p ^ p);
+    
+    x[0]=add_cc(x[0], c!=0);
+    #pragma unroll
+    for(int32_t index=1;index<LIMBS;index++)
+      x[index]=addc_cc(x[index], 0);
+  
+    result=__shfl_sync(0xFFFFFFFF, x[PAD_LIMB], PAD_THREAD, tpi);
+    x[PAD_LIMB]=(group_thread!=PAD_THREAD) ? x[PAD_LIMB] : 0;
+    return result;
+  }
   
   /****************************************************************
    * returns 1 if carries out
