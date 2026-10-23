@@ -101,6 +101,15 @@ class core_t {
     return dispatch_resolver_t<core_t, TPI, PADDING>::fast_propagate_add(carry, x);
   }
 
+  /* opt-07: converged variant, straight-line montgomery tails only */
+  __device__ __forceinline__ static int32_t  fast_propagate_add_conv(const uint32_t carry, uint32_t &x) {
+    return dispatch_resolver_t<core_t, TPI, PADDING>::fast_propagate_add_conv(carry, x);
+  }
+
+  __device__ __forceinline__ static int32_t  fast_propagate_add_conv(const uint32_t carry, uint32_t x[LIMBS]) {
+    return dispatch_resolver_t<core_t, TPI, PADDING>::fast_propagate_add_conv(carry, x);
+  }
+
   __device__ __forceinline__ static int32_t  fast_propagate_sub(const uint32_t carry, uint32_t &x) {
     return dispatch_resolver_t<core_t, TPI, PADDING>::fast_propagate_sub(carry, x);
   }

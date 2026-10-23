@@ -25,9 +25,27 @@ IN THE SOFTWARE.
 namespace cgbn {
 
 #if 1
+/* opt-07: mont_mul / mont_mul_ui32 / mont_reduce_wide are straight-line
+   collective code: one instance per TPI segment (TPI<=32, per-warp packing)
+   and every warp lane participating (callers must not exit lanes mid-op).
+   The compile-time full-warp mask lets ptxas inline each SHFL instead of
+   emitting the ~7-slot __cuda_sm70_shflsync_idx_p helper call that a runtime
+   instance mask produces.  Instance-divergent callers (gcd, modinv, the
+   conditional -n fix inside mont_reduce_wide) must keep sync_mask(). */
+/* opt-07: the inline-SHFL codegen is scoped to PADDING==0 shapes.  On the
+ * padded path (e.g. 544/8) constant-folding the shfl/ballot masks to
+ * 0xFFFFFFFF triggers an nvcc 13.0 miscompile of the same family as the
+ * documented cgbn_sub full-container anomaly (dirty words above BITS/32 in
+ * one-iteration mulcheck runs; shape-isolated to padded mont codegen, green
+ * on every PADDING==0 shape incl. odd-LIMBS 768/8 and 384/4).  The ternary
+ * folds at compile time: padded instantiations keep the base instance-mask
+ * path bit-for-bit, unpadded ones get the inlined collectives. */
+#define CGBN_MONT_SYNC ((PADDING==0)?CGBN_WARP_SYNC:sync_mask())
+#define CGBN_WARP_SYNC 0xFFFFFFFFu
+
 template<class env>
 __device__ __forceinline__ void core_t<env>::mont_mul(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t b[LIMBS], const uint32_t n[LIMBS], const uint32_t np0) {
-  uint32_t sync=sync_mask(), group_thread=threadIdx.x & TPI-1;
+  uint32_t sync=CGBN_MONT_SYNC, group_thread=threadIdx.x & TPI-1;
   uint32_t t, t0, t1, q, r1, ra[LIMBS+2], ru[LIMBS+1], c=0;
     
   #pragma unroll
@@ -175,7 +193,7 @@ __device__ __forceinline__ void core_t<env>::mont_mul(uint32_t r[LIMBS], const u
     r[index]=chain10.add(r[index], 0);
   c=chain10.add(r1, 0);
 
-  c=-fast_propagate_add(c, r);
+  if(PADDING==0) c=-fast_propagate_add_conv(c, r); else c=-fast_propagate_add(c, r);
 
   // compute -n
   t=n[0]-(group_thread==0);   // n must be odd, so there is no chance for a carry ripple
@@ -186,7 +204,7 @@ __device__ __forceinline__ void core_t<env>::mont_mul(uint32_t r[LIMBS], const u
   for(int32_t index=1;index<LIMBS;index++)
     r[index]=chain11.add(r[index], ~n[index] & c);
   c=chain11.add(0, 0);
-  fast_propagate_add(c, r);
+  if(PADDING==0) fast_propagate_add_conv(c, r); else fast_propagate_add(c, r);
   clear_padding(r);
 }
 #endif
@@ -199,7 +217,7 @@ __device__ __forceinline__ void core_t<env>::mont_mul(uint32_t r[LIMBS], const u
    mont_reduce_wide -- which then yields w / 2^32 mod n. */
 template<class env>
 __device__ __forceinline__ void core_t<env>::mont_mul_ui32(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t d, const uint32_t n[LIMBS], const uint32_t np0) {
-  uint32_t sync=sync_mask(), group_thread=threadIdx.x & TPI-1;
+  uint32_t sync=CGBN_MONT_SYNC, group_thread=threadIdx.x & TPI-1;
   uint32_t lo[LIMBS], hi[LIMBS], c, carry;
 
   // w = a*d: lo[index] = word group_thread*LIMBS+index; the running high word
@@ -249,7 +267,7 @@ __device__ __forceinline__ void core_t<env>::mont_mul_ui32(uint32_t r[LIMBS], co
 
 template<class env>
 __device__ __forceinline__ void core_t<env>::mont_reduce_wide(uint32_t r[LIMBS], const uint32_t lo[LIMBS], const uint32_t hi[LIMBS], const uint32_t n[LIMBS], const uint32_t np0, const bool zero) {
-  uint32_t sync=sync_mask(), group_thread=threadIdx.x & TPI-1;
+  uint32_t sync=CGBN_MONT_SYNC, group_thread=threadIdx.x & TPI-1;
   uint32_t t0, t1, q, ra[LIMBS+2], ru[LIMBS+1], c=0, top;
 
   #pragma unroll
@@ -344,7 +362,7 @@ __device__ __forceinline__ void core_t<env>::mont_reduce_wide(uint32_t r[LIMBS],
     ra[index]=chain5.add(ra[index], ru[index-1]);
   c=chain5.add(ra[LIMBS], 0);
   
-  c=fast_propagate_add(c, ra);
+  if(PADDING==0) c=fast_propagate_add_conv(c, ra); else c=fast_propagate_add(c, ra);
   
   if(!zero && c!=0) {
     t0=n[0]-(group_thread==0);   // n must be odd, so there is no chance for a carry ripple
