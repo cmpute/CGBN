@@ -167,6 +167,50 @@ class dispatch_resolver_t {
    * returns 1 if carries out
    * returns 0 otherwise
    ****************************************************************/
+  /* opt-08: converged variant (see subwarp_resolver.cu): compile-time
+   * full-warp masks on the ballots/shfl (inlined VOTE/SHFL), ballots
+   * confined to the instance's window with the per-lane instance mask.
+   * Otherwise identical to fast_propagate_sub. */
+  __device__ __forceinline__ static int32_t fast_propagate_sub_conv(const uint32_t carry, uint32_t &x) {
+    uint32_t sync=core::sync_mask(), group_thread=threadIdx.x & tpi-1;
+    uint32_t lane=1<<(threadIdx.x & warpSize-1);
+    uint32_t g, p, c;
+    int32_t  result;
+
+    g=__ballot_sync(0xFFFFFFFF, carry==0xFFFFFFFF) & sync;
+    p=__ballot_sync(0xFFFFFFFF, x==0) & sync;
+
+    c=lane & (g+g+p ^ p);
+    x=x-(c!=0);
+    result=__shfl_sync(0xFFFFFFFF, x, padding, tpi);
+    x=(group_thread<padding) ? x : 0;
+    return result & 1;
+  }
+
+  __device__ __forceinline__ static int32_t fast_propagate_sub_conv(const uint32_t carry, uint32_t x[LIMBS]) {
+    uint32_t sync=core::sync_mask(), group_thread=threadIdx.x & tpi-1, group_base=group_thread*LIMBS;
+    uint32_t warp_thread=threadIdx.x & warpSize-1, lane=1<<warp_thread;
+    uint32_t lor, g, p, c;
+    int32_t  result;
+
+    lor=mplor<LIMBS>(x);
+    g=__ballot_sync(0xFFFFFFFF, carry==0xFFFFFFFF) & sync;
+    p=__ballot_sync(0xFFFFFFFF, lor==0) & sync;
+
+    c=lane & (g+g+p ^ p);
+    c=(c==0) ? 0 : 0xFFFFFFFF;
+
+    x[0]=add_cc(x[0], c);
+    #pragma unroll
+    for(int32_t index=1;index<LIMBS;index++)
+      x[index]=addc_cc(x[index], c);
+
+    result=__shfl_sync(0xFFFFFFFF, x[PAD_LIMB], PAD_THREAD, tpi);
+    #pragma unroll
+    for(int32_t index=0;index<LIMBS;index++)
+      x[index]=(group_base<BITS/32-index) ? x[index] : 0;
+    return result & 1;
+  }
   __device__ __forceinline__ static int32_t fast_propagate_sub(const uint32_t carry, uint32_t &x) {
     uint32_t sync=core::sync_mask(), group_thread=threadIdx.x & tpi-1;
     uint32_t lane=1<<(threadIdx.x & warpSize-1);

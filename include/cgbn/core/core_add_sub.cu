@@ -48,6 +48,35 @@ __device__ __forceinline__ int32_t core_t<env>::sub(uint32_t r[LIMBS], const uin
   return -fast_propagate_sub(carry, r);
 } 
 
+/* opt-08: converged add/sub for straight-line callers (rho/ecm loops):
+ * identical to add/sub except the resolver ballots take the compile-time
+ * full-warp mask, which ptxas inlines instead of emitting the
+ * __cuda_sm70_votesync_ballot helper call.  Instance-divergent callers
+ * (gcd/modinv and conditionally-executed regions) must use plain add/sub. */
+template<class env> 
+__device__ __forceinline__ int32_t core_t<env>::add_conv(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t b[LIMBS]) {
+  uint32_t carry;
+
+  chain_t<> chain;
+  #pragma unroll
+  for(int32_t index=0;index<LIMBS;index++)
+    r[index]=chain.add(a[index], b[index]);
+  carry=chain.add(0, 0);
+  return fast_propagate_add_conv(carry, r);
+}
+
+template<class env> 
+__device__ __forceinline__ int32_t core_t<env>::sub_conv(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t b[LIMBS]) {
+  uint32_t carry;
+  
+  chain_t<> chain;
+  #pragma unroll
+  for(int32_t index=0;index<LIMBS;index++)
+    r[index]=chain.sub(a[index], b[index]);
+  carry=chain.sub(0, 0);
+  return -fast_propagate_sub_conv(carry, r);
+} 
+
 template<class env> 
 __device__ __forceinline__ int32_t core_t<env>::negate(uint32_t r[LIMBS], const uint32_t a[LIMBS]) {
   mpset<LIMBS>(r, a);
