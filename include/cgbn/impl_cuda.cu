@@ -345,6 +345,17 @@ __device__ __forceinline__ int32_t cgbn_env_t<context_t, bits, syncable>::sub(cg
   return cgbn::core_t<cgbn_env_t>::sub(r._limbs, a._limbs, b._limbs);
 }
 
+/* opt-08: converged add/sub for straight-line callers (see core_add_sub.cu) */
+template<class context_t, uint32_t bits, cgbn_syncable_t syncable>
+__device__ __forceinline__ int32_t cgbn_env_t<context_t, bits, syncable>::add_conv(cgbn_t &r, const cgbn_t &a, const cgbn_t &b) const {
+  return cgbn::core_t<cgbn_env_t>::add_conv(r._limbs, a._limbs, b._limbs);
+}
+
+template<class context_t, uint32_t bits, cgbn_syncable_t syncable>
+__device__ __forceinline__ int32_t cgbn_env_t<context_t, bits, syncable>::sub_conv(cgbn_t &r, const cgbn_t &a, const cgbn_t &b) const {
+  return cgbn::core_t<cgbn_env_t>::sub_conv(r._limbs, a._limbs, b._limbs);
+}
+
 template<class context_t, uint32_t bits, cgbn_syncable_t syncable>
 __device__ __forceinline__ int32_t cgbn_env_t<context_t, bits, syncable>::negate(cgbn_t &r, const cgbn_t &a) const {
   return cgbn::core_t<cgbn_env_t>::negate(r._limbs, a._limbs);

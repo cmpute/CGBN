@@ -145,6 +145,10 @@ class cgbn_env_t {
   __device__ __forceinline__ void       swap(cgbn_t &r, cgbn_t &a) const;
   __device__ __forceinline__ int32_t    add(cgbn_t &r, const cgbn_t &a, const cgbn_t &b) const;
   __device__ __forceinline__ int32_t    sub(cgbn_t &r, const cgbn_t &a, const cgbn_t &b) const;
+  /* opt-08: converged add/sub -- straight-line (converged, no exited
+     lanes) callers only; divergent contexts must use add/sub. */
+  __device__ __forceinline__ int32_t    add_conv(cgbn_t &r, const cgbn_t &a, const cgbn_t &b) const;
+  __device__ __forceinline__ int32_t    sub_conv(cgbn_t &r, const cgbn_t &a, const cgbn_t &b) const;
   __device__ __forceinline__ int32_t    negate(cgbn_t &r, const cgbn_t &a) const;
   __device__ __forceinline__ void       mul(cgbn_t &r, const cgbn_t &a, const cgbn_t &b) const;
   __device__ __forceinline__ void       mul_high(cgbn_t &r, const cgbn_t &a, const cgbn_t &b) const;

@@ -102,6 +102,15 @@ class core_t {
   }
 
   /* opt-07: converged variant, straight-line montgomery tails only */
+  __device__ __forceinline__ static int32_t  fast_propagate_sub_conv(const uint32_t carry, uint32_t &x) {
+    return dispatch_resolver_t<core_t, TPI, PADDING>::fast_propagate_sub_conv(carry, x);
+  }
+
+  __device__ __forceinline__ static int32_t  fast_propagate_sub_conv(const uint32_t carry, uint32_t x[LIMBS]) {
+    return dispatch_resolver_t<core_t, TPI, PADDING>::fast_propagate_sub_conv(carry, x);
+  }
+
+  /* opt-07: converged variant, straight-line montgomery tails only */
   __device__ __forceinline__ static int32_t  fast_propagate_add_conv(const uint32_t carry, uint32_t &x) {
     return dispatch_resolver_t<core_t, TPI, PADDING>::fast_propagate_add_conv(carry, x);
   }
@@ -199,6 +208,12 @@ class core_t {
   /* BASIC ARITHMETIC */
   __device__ __forceinline__ static int32_t  add(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t b[LIMBS]);
   __device__ __forceinline__ static int32_t  sub(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t b[LIMBS]);
+  /* opt-08: converged variants -- same semantics as add/sub, but the
+   * resolver ballots take the compile-time full-warp mask.  Valid ONLY in
+   * straight-line (per-warp converged, no exited lanes) contexts; the
+   * divergent gcd/modinv paths must use the plain add/sub. */
+  __device__ __forceinline__ static int32_t  add_conv(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t b[LIMBS]);
+  __device__ __forceinline__ static int32_t  sub_conv(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t b[LIMBS]);
   __device__ __forceinline__ static int32_t  negate(uint32_t r[LIMBS], const uint32_t a[LIMBS]);
   __device__ __forceinline__ static void     mul(uint32_t &r, const uint32_t a, const uint32_t b, const uint32_t add);
   __device__ __forceinline__ static void     mul(uint32_t r[LIMBS], const uint32_t a[LIMBS], const uint32_t b[LIMBS], const uint32_t add[LIMBS]);

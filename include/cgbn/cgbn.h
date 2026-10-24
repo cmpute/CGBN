@@ -184,6 +184,19 @@ __host__ __device__ __forceinline__ void cgbn_set_ui32(env_t env, typename env_t
   env.set_ui32(r, value);
 }
 
+/* opt-08: converged add/sub for straight-line (converged, no exited lanes)
+   device contexts; identical results to cgbn_add/cgbn_sub in that regime.
+   Instance-divergent code (gcd/modinv-style) must use the plain forms. */
+template<class env_t>
+__host__ __device__ __forceinline__ int32_t cgbn_add_conv(env_t env, typename env_t::cgbn_t &r, const typename env_t::cgbn_t &a, const typename env_t::cgbn_t &b) {
+  return env.add_conv(r, a, b);
+}
+
+template<class env_t>
+__host__ __device__ __forceinline__ int32_t cgbn_sub_conv(env_t env, typename env_t::cgbn_t &r, const typename env_t::cgbn_t &a, const typename env_t::cgbn_t &b) {
+  return env.sub_conv(r, a, b);
+}
+
 template<class env_t>
 __host__ __device__ __forceinline__ int32_t cgbn_add_ui32(env_t env, typename env_t::cgbn_t &r, const typename env_t::cgbn_t &a, const uint32_t add) {
   return env.add_ui32(r, a, add);

@@ -156,6 +156,14 @@ class dispatch_resolver_t<core, 32, 0> {
     return fast_propagate_add(carry, x);
   }
   
+  __device__ __forceinline__ static int32_t fast_propagate_sub_conv(const uint32_t carry, uint32_t &x) {
+    return fast_propagate_sub(carry, x);
+  }
+  
+  __device__ __forceinline__ static int32_t fast_propagate_sub_conv(const uint32_t carry, uint32_t x[LIMBS]) {
+    return fast_propagate_sub(carry, x);
+  }
+  
   __device__ __forceinline__ static int32_t resolve_add(const int32_t carry, uint32_t &x) {
     uint32_t sync=0xFFFFFFFF, warp_thread=threadIdx.x & warpSize-1, lane=1<<warp_thread;
     uint32_t g, p, c;

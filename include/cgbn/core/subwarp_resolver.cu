@@ -161,6 +161,51 @@ class dispatch_resolver_t<core, tpi, 0> {
   
   
   /****************************************************************
+   * opt-08: converged variant of fast_propagate_sub for straight-line
+   * callers (same contract as fast_propagate_add_conv above).
+   ****************************************************************/
+  __device__ __forceinline__ static int32_t fast_propagate_sub_conv(const uint32_t carry, uint32_t &x) {
+    uint32_t sync=core::sync_mask(), group_thread=threadIdx.x & tpi-1, warp_thread=threadIdx.x & warpSize-1;
+    uint32_t lane=(group_thread==0) ? 0 : 1<<warp_thread;
+    uint32_t g, p, c; 
+    uint64_t sum;
+  
+    g=__ballot_sync(0xFFFFFFFF, carry==0xFFFFFFFF) & sync;
+    p=__ballot_sync(0xFFFFFFFF, x==0 && group_thread!=0) & sync;
+  
+    // wrap the carry around  
+    sum=make_wide(g, g) + make_wide(g, g) + make_wide(p, p);
+    c=lane & (p ^ sum);
+
+    x=x-(c!=0);
+
+    return uright_wrap(sum>>32, 0, threadIdx.x - group_thread + tpi) & 0x01;
+  }
+  
+  __device__ __forceinline__ static int32_t fast_propagate_sub_conv(const uint32_t carry, uint32_t x[LIMBS]) {
+    uint32_t sync=core::sync_mask(), group_thread=threadIdx.x & tpi-1, warp_thread=threadIdx.x & warpSize-1;
+    uint32_t lane=(group_thread==0) ? 0 : 1<<warp_thread;
+    uint32_t lor, g, p, c; 
+    uint64_t sum;
+    
+    lor=mplor<LIMBS>(x);
+    g=__ballot_sync(0xFFFFFFFF, carry==0xFFFFFFFF) & sync;
+    p=__ballot_sync(0xFFFFFFFF, lor==0 && group_thread!=0) & sync;
+
+    // wrap the carry around  
+    sum=make_wide(g, g) + make_wide(g, g) + make_wide(p, p);
+    c=lane & (p ^ sum);
+    c=(c==0) ? 0 : 0xFFFFFFFF;
+    
+    x[0]=add_cc(x[0], c);
+    #pragma unroll
+    for(int32_t index=1;index<LIMBS;index++)
+      x[index]=addc_cc(x[index], c);
+
+    return uright_wrap(sum>>32, 0, threadIdx.x - group_thread + tpi) & 0x01;
+  }
+  
+    /****************************************************************
    * returns 1 if borrows out
    * returns 0 otherwise
    ****************************************************************/
